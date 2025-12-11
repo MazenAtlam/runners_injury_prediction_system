@@ -9,9 +9,7 @@ class Person(AuditBase, db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-
-    # Discriminator column for Polymorphism
-    type = db.Column(db.String(50))
+    type = db.Column(db.String(50))  # Discriminator column for Polymorphism
 
     __mapper_args__ = {
         'polymorphic_identity': 'person',

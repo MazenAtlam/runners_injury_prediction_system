@@ -20,7 +20,11 @@ class SensorData(AuditBase):
     range_of_motion = db.Column(db.Float, nullable=False)
 
     # Relationship using string reference to avoid circular import
-    session = db.relationship("Session", back_populates="sensor_data")
+    session = db.relationship(
+        "Session",
+        back_populates="sensor_data",
+        foreign_keys=[session_id]
+    )
 
     def __repr__(self):
         return f"<SensorData {self.id}>"

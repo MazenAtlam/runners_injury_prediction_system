@@ -11,13 +11,26 @@ class Session(AuditBase):
     athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
     coach_id = db.Column(db.Integer, db.ForeignKey('coach.id'), nullable=False)
 
-    # Relationships using string references to avoid circular imports
-    # Note: "Athlete" and "Coach" are strings here too, which is safer
-    athlete = db.relationship("Athlete", back_populates="sessions")
-    coach = db.relationship("Coach", back_populates="sessions")
+    # Relationships using string references
+    athlete = db.relationship(
+        "Athlete",
+        back_populates="sessions",
+        foreign_keys=[athlete_id]
+    )
+
+    coach = db.relationship(
+        "Coach",
+        back_populates="sessions",
+        foreign_keys=[coach_id]
+    )
 
     # The problematic relationship: changed to string reference
-    sensor_data = db.relationship("SensorData", back_populates="session", cascade="all, delete-orphan")
+    sensor_data = db.relationship(
+        "SensorData",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        foreign_keys="SensorData.session_id"
+    )
 
     def __repr__(self):
         return f"<Session {self.id} - Athlete: {self.athlete_id}>"
