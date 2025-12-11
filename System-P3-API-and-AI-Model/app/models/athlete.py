@@ -12,8 +12,18 @@ class Athlete(Person):
     coach_id = db.Column(db.Integer, db.ForeignKey('coach.id'), nullable=True)
 
     # Relationships (String reference)
-    coach = db.relationship("Coach", back_populates="athletes")
-    sessions = db.relationship("Session", back_populates="athlete", cascade="all, delete-orphan")
+    coach = db.relationship(
+        "Coach",
+        back_populates="athletes",
+        foreign_keys=[coach_id]
+    )
+
+    sessions = db.relationship(
+        "Session",
+        back_populates="athlete",
+        cascade="all, delete-orphan",
+        foreign_keys="Session.athlete_id"
+    )
 
     __mapper_args__ = {
         'polymorphic_identity': 'athlete',

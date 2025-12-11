@@ -1,7 +1,12 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from .config import Config, db, migrate
+from .routes.coach_bp import coach_bp
+from .routes.athlete_bp import athlete_bp
+from .routes.session_bp import session_bp
+from .routes.sensor_data_bp import sensor_data_bp
 
+API_V1_BASE_URL = '/api/v1.0'
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -16,6 +21,21 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # --- Register Blueprints (API Modules) ---
+    app.register_blueprint(coach_bp, url_prefix=f'{API_V1_BASE_URL}/coach')
+    app.register_blueprint(athlete_bp, url_prefix=f'{API_V1_BASE_URL}/athlete')
+    app.register_blueprint(session_bp, url_prefix=f'{API_V1_BASE_URL}/session')
+    app.register_blueprint(sensor_data_bp, url_prefix=f'{API_V1_BASE_URL}/sensor_data')
+
+    # --- Root Route ---
+    @app.route('/')
+    def index():
+        return "Runners Injury Prediction System Backend Running! Connect your client to /api/v1.0/..."
+
+    # --- Global Error Handler ---
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({'error': 'Resource not found'}), 404
 
     # Create database tables if they don't exist
     with app.app_context():
@@ -27,8 +47,5 @@ def create_app(config_class=Config):
         from .models.sensor_data import SensorData
 
         db.create_all()
-
-        print(f"✓ Database tables ready")
-        print(f"✓ Metadata tables: {list(db.metadata.tables.keys())}")
 
     return app
