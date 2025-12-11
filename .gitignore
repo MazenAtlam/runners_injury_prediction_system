@@ -2,11 +2,12 @@
 # Project Structure
 # ===================================================
 # Ignore project-specific directories
-/deployment/
-/backups/
-/temp/
-/tmp/
-/archive/
+*/deployment/
+*/backups/
+*/temp/
+*/tmp/
+*/archive/
+*/test_scripts/
 
 # ===================================================
 # Python (Flask API & AI Model)
@@ -88,6 +89,7 @@ venv.bak/
 
 # Flask
 instance/
+migrations/
 .webassets-cache
 
 # Jupyter Notebook

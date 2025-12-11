@@ -1,8 +1,13 @@
 import os
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 load_dotenv()
 
+# Initialize the database instance directly here
+db = SQLAlchemy()
+migrate = Migrate()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -12,7 +17,7 @@ class Config:
     API_VERSION = os.environ.get('API_VERSION', 'v0.0')
 
     # Model settings
-    MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ai_classification_models', 'injury_prediction_model.pkl')
+    MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ai_classification_models', 'runners_injury_prediction_model.pkl')
 
     # Alert settings
     ALERT_THRESHOLDS = {
@@ -37,3 +42,11 @@ class Config:
         'range_of_motion': (60, 180),
         'ambient_temperature': (15, 38)
     }
+
+    # Database Configuration
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///runners.db')
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Flask-Migrate configuration
+    MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), 'migrations')
