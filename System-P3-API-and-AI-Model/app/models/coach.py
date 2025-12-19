@@ -12,7 +12,7 @@ class Coach(Person):
     athletes = db.relationship(
         "Athlete",
         back_populates="coach",
-        cascade="all, delete-orphan",
+        cascade="all",
         foreign_keys="Athlete.coach_id"
     )
 

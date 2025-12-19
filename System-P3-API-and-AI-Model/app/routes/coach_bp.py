@@ -97,12 +97,18 @@ def delete_coach(current_user, id):
     # Find existing, non-deleted coach
     coach = Coach.query.filter_by(id=id, deleted_on=None).first_or_404()
     try:
-        # Soft delete
+        # Unassign all athletes associated with this coach
+        for athlete in coach.athletes:
+            athlete.coach_id = None
+            athlete.updated_on = date.today()
+            athlete.updated_by = f"SYSTEM (Coach {id} Deleted)"
+
+        # Soft delete the coach
         coach.deleted_on = date.today()
         coach.deleted_by = current_user.name
 
         db.session.commit()
-        return jsonify({'message': 'Coach deleted successfully'}), 200
+        return jsonify({'message': 'Coach deleted successfully and athletes unassigned'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
