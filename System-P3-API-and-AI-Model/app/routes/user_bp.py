@@ -39,9 +39,9 @@ def register():
         if user_type == 'athlete':
             # Handle Athlete specific fields
             coach_id = data.get('coach_id')
-            # Verify coach exists if ID is provided
+            # Verify coach exists if ID is provided (and check it's not deleted)
             if coach_id:
-                if not Coach.query.get(coach_id):
+                if not Coach.query.filter_by(id=coach_id, deleted_on=None).first():
                     return jsonify({'error': f'Coach with id {coach_id} not found'}), 404
 
             new_user = Athlete(
