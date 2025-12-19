@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from .config import Config, db, migrate
@@ -9,12 +10,14 @@ from .routes.sensor_data_bp import sensor_data_bp
 from .routes.runners_model_bp import runners_model_bp
 
 API_V1_BASE_URL = '/api/v1.0'
+REACT_NATIVE_SERVER = os.environ.get('REACT_NATIVE_SERVER', 'http://localhost:8081')
+EXPO_GO_SERVER = os.environ.get('EXPO_GO_SERVER', 'http://localhost:19006')
 
 def create_app(config_class=Config):
     app = Flask(__name__)
 
     # Enable CORS for mobile app communication
-    CORS(app)
+    CORS(app, resources={r"/api/*": {"origins": [REACT_NATIVE_SERVER, EXPO_GO_SERVER]}})
 
     # Load configuration
     app.config.from_object(config_class)
