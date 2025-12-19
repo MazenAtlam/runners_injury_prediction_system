@@ -1,23 +1,28 @@
 from flask import Blueprint, request, jsonify
 from ..config import db
 from ..models.coach import Coach
+from ..utils.auth import token_required
 from datetime import date
+from werkzeug.security import generate_password_hash
 
 coach_bp = Blueprint('coach_bp', __name__)
 
 
 # CREATE
 @coach_bp.route('/', methods=['POST'])
-def create_coach():
+@token_required
+def create_coach(current_user):
     data = request.get_json()
 
     try:
+        hashed_password = generate_password_hash(data['password'])
+
         new_coach = Coach(
             name=data['name'],
             email=data['email'],
-            password=data['password'],
+            password=hashed_password,
             created_on=date.today(),
-            created_by=data.get('created_by', 'API_USER')
+            created_by=current_user.name
         )
 
         db.session.add(new_coach)
@@ -31,8 +36,10 @@ def create_coach():
 
 # READ ALL
 @coach_bp.route('/', methods=['GET'])
-def get_coaches():
-    coaches = Coach.query.all()
+@token_required
+def get_coaches(current_user):
+    # Filter out deleted coaches
+    coaches = Coach.query.filter(Coach.deleted_on.is_(None)).all()
     result = []
     for coach in coaches:
         result.append({
@@ -46,8 +53,10 @@ def get_coaches():
 
 # READ ONE
 @coach_bp.route('/<int:id>', methods=['GET'])
-def get_coach(id):
-    coach = Coach.query.get_or_404(id)
+@token_required
+def get_coach(current_user, id):
+    # Use filter_by with deleted_on=None
+    coach = Coach.query.filter_by(id=id, deleted_on=None).first_or_404()
     return jsonify({
         'id': coach.id,
         'name': coach.name,
@@ -59,8 +68,10 @@ def get_coach(id):
 
 # UPDATE
 @coach_bp.route('/<int:id>', methods=['PUT'])
-def update_coach(id):
-    coach = Coach.query.get_or_404(id)
+@token_required
+def update_coach(current_user, id):
+    # Use filter_by with deleted_on=None
+    coach = Coach.query.filter_by(id=id, deleted_on=None).first_or_404()
     data = request.get_json()
 
     try:
@@ -70,7 +81,7 @@ def update_coach(id):
             coach.email = data['email']
 
         coach.updated_on = date.today()
-        coach.updated_by = data.get('updated_by', 'API_USER')
+        coach.updated_by = current_user.name
 
         db.session.commit()
         return jsonify({'message': 'Coach updated successfully'}), 200
@@ -81,10 +92,15 @@ def update_coach(id):
 
 # DELETE
 @coach_bp.route('/<int:id>', methods=['DELETE'])
-def delete_coach(id):
-    coach = Coach.query.get_or_404(id)
+@token_required
+def delete_coach(current_user, id):
+    # Find existing, non-deleted coach
+    coach = Coach.query.filter_by(id=id, deleted_on=None).first_or_404()
     try:
-        db.session.delete(coach)
+        # Soft delete
+        coach.deleted_on = date.today()
+        coach.deleted_by = current_user.name
+
         db.session.commit()
         return jsonify({'message': 'Coach deleted successfully'}), 200
     except Exception as e:

@@ -11,7 +11,7 @@ class SensorData(AuditBase):
     body_temperature = db.Column(db.Float, nullable=False)
     ambient_temperature = db.Column(db.Float, nullable=False)
     heart_rate = db.Column(db.Float, nullable=False)
-    joint_angle = db.Column(db.Float, nullable=False)
+    joint_angles = db.Column(db.Float, nullable=False)
     gait_speed = db.Column(db.Float, nullable=False)
     cadence = db.Column(db.Float, nullable=False)
     step_count = db.Column(db.Integer, nullable=False)

@@ -1,24 +1,29 @@
 from flask import Blueprint, request, jsonify
 from ..config import db
 from ..models.athlete import Athlete
+from ..utils.auth import token_required
 from datetime import date
+from werkzeug.security import generate_password_hash
 
 athlete_bp = Blueprint('athlete_bp', __name__)
 
 
 # CREATE
 @athlete_bp.route('/', methods=['POST'])
-def create_athlete():
+@token_required
+def create_athlete(current_user):
     data = request.get_json()
 
     try:
+        hashed_password = generate_password_hash(data['password'])
+
         new_athlete = Athlete(
             name=data['name'],
             email=data['email'],
-            password=data['password'],  # In a real app, hash this!
+            password=hashed_password,
             coach_id=data.get('coach_id'),
             created_on=date.today(),
-            created_by=data.get('created_by', 'API_USER')
+            created_by=current_user.name
         )
 
         db.session.add(new_athlete)
@@ -32,8 +37,10 @@ def create_athlete():
 
 # READ ALL
 @athlete_bp.route('/', methods=['GET'])
-def get_athletes():
-    athletes = Athlete.query.all()
+@token_required
+def get_athletes(current_user):
+    # Filter out deleted athletes
+    athletes = Athlete.query.filter(Athlete.deleted_on.is_(None)).all()
     result = []
     for athlete in athletes:
         result.append({
@@ -48,8 +55,10 @@ def get_athletes():
 
 # READ ONE
 @athlete_bp.route('/<int:id>', methods=['GET'])
-def get_athlete(id):
-    athlete = Athlete.query.get_or_404(id)
+@token_required
+def get_athlete(current_user, id):
+    # Use filter_by with deleted_on=None
+    athlete = Athlete.query.filter_by(id=id, deleted_on=None).first_or_404()
     return jsonify({
         'id': athlete.id,
         'name': athlete.name,
@@ -62,8 +71,10 @@ def get_athlete(id):
 
 # UPDATE
 @athlete_bp.route('/<int:id>', methods=['PUT'])
-def update_athlete(id):
-    athlete = Athlete.query.get_or_404(id)
+@token_required
+def update_athlete(current_user, id):
+    # Use filter_by with deleted_on=None
+    athlete = Athlete.query.filter_by(id=id, deleted_on=None).first_or_404()
     data = request.get_json()
 
     try:
@@ -76,7 +87,7 @@ def update_athlete(id):
 
         # Audit update fields
         athlete.updated_on = date.today()
-        athlete.updated_by = data.get('updated_by', 'API_USER')
+        athlete.updated_by = current_user.name
 
         db.session.commit()
         return jsonify({'message': 'Athlete updated successfully'}), 200
@@ -87,10 +98,15 @@ def update_athlete(id):
 
 # DELETE
 @athlete_bp.route('/<int:id>', methods=['DELETE'])
-def delete_athlete(id):
-    athlete = Athlete.query.get_or_404(id)
+@token_required
+def delete_athlete(current_user, id):
+    # Find existing, non-deleted athlete
+    athlete = Athlete.query.filter_by(id=id, deleted_on=None).first_or_404()
     try:
-        db.session.delete(athlete)
+        # Soft delete: update fields instead of removing record
+        athlete.deleted_on = date.today()
+        athlete.deleted_by = current_user.name
+
         db.session.commit()
         return jsonify({'message': 'Athlete deleted successfully'}), 200
     except Exception as e:
