@@ -27,7 +27,8 @@ def token_required(f):
 
         try:
             data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
-            current_user = Person.query.get(data['user_id'])
+            # Ensure the user itself isn't deleted (soft deleted users shouldn't have access)
+            current_user = Person.query.filter_by(id=data['user_id'], deleted_on=None).first()
             if not current_user:
                 return jsonify({'error': 'User not found'}), 401
         except jwt.ExpiredSignatureError:
