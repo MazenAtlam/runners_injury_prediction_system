@@ -5,6 +5,7 @@ from .routes.coach_bp import coach_bp
 from .routes.athlete_bp import athlete_bp
 from .routes.session_bp import session_bp
 from .routes.sensor_data_bp import sensor_data_bp
+from .routes.runners_model_bp import runners_model_bp
 
 API_V1_BASE_URL = '/api/v1.0'
 
@@ -26,6 +27,7 @@ def create_app(config_class=Config):
     app.register_blueprint(athlete_bp, url_prefix=f'{API_V1_BASE_URL}/athlete')
     app.register_blueprint(session_bp, url_prefix=f'{API_V1_BASE_URL}/session')
     app.register_blueprint(sensor_data_bp, url_prefix=f'{API_V1_BASE_URL}/sensor_data')
+    app.register_blueprint(runners_model_bp, url_prefix=f'{API_V1_BASE_URL}/runners_model')
 
     # --- Root Route ---
     @app.route('/')

@@ -17,7 +17,7 @@ def create_sensor_data():
             body_temperature=data['body_temperature'],
             ambient_temperature=data['ambient_temperature'],
             heart_rate=data['heart_rate'],
-            joint_angle=data['joint_angle'],
+            joint_angles=data['joint_angles'],
             gait_speed=data['gait_speed'],
             cadence=data['cadence'],
             step_count=data['step_count'],
@@ -71,7 +71,7 @@ def get_sensor_data_entry(id):
         'body_temperature': d.body_temperature,
         'ambient_temperature': d.ambient_temperature,
         'heart_rate': d.heart_rate,
-        'joint_angle': d.joint_angle,
+        'joint_angles': d.joint_angles,
         'gait_speed': d.gait_speed,
         'cadence': d.cadence,
         'step_count': d.step_count,
@@ -91,7 +91,7 @@ def update_sensor_data(id):
     try:
         # Loop through allow-listed fields to update
         fields = ['body_temperature', 'ambient_temperature', 'heart_rate',
-                  'joint_angle', 'gait_speed', 'cadence', 'step_count',
+                  'joint_angles', 'gait_speed', 'cadence', 'step_count',
                   'jump_height', 'ground_reaction_force', 'range_of_motion']
 
         for field in fields:
