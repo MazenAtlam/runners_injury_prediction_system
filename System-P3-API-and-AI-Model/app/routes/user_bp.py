@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify, current_app
-from ..config import db
+from flask import Blueprint, request, jsonify, current_app, url_for
+from ..config import db, mail
 from ..models.person import Person
 from ..models.athlete import Athlete
 from ..models.coach import Coach
@@ -8,6 +8,7 @@ from ..utils.auth import token_required
 from datetime import date, datetime, timedelta
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_mail import Message
 
 user_bp = Blueprint('user_bp', __name__)
 
@@ -145,3 +146,90 @@ def logout(current_user):
             return jsonify({'error': str(e)}), 500
 
     return jsonify({'error': 'Token not provided'}), 400
+
+
+@user_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    if not data or 'email' not in data:
+        return jsonify({'error': 'Email is required'}), 400
+
+    email = data['email']
+    # Check if user exists and is not deleted
+    user = Person.query.filter_by(email=email, deleted_on=None).first()
+
+    # Always return success message to prevent email enumeration
+    if not user:
+        return jsonify({'message': 'If an account with that email exists, a password reset link has been sent.'}), 200
+
+    try:
+        # Generate a reset token (valid for 30 minutes)
+        token = jwt.encode({
+            'user_id': user.id,
+            'type': 'reset',
+            'exp': datetime.utcnow() + timedelta(minutes=30)
+        }, current_app.config['SECRET_KEY'], algorithm="HS256")
+
+        # Construct reset URL (Deep link or Web URL)
+        frontend_url = current_app.config['FRONTEND_URL']
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+
+        # Send Email
+        msg = Message("Password Reset Request - Runners App",
+                      sender=current_app.config['MAIL_DEFAULT_SENDER'],
+                      recipients=[email])
+        msg.body = f"""Hello {user.name},
+
+You requested a password reset. Please click the link below to reset your password:
+
+{reset_link}
+
+This link will expire in 30 minutes.
+
+If you did not request this, please ignore this email.
+"""
+        mail.send(msg)
+
+        return jsonify({'message': 'If an account with that email exists, a password reset link has been sent.'}), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to send email: {str(e)}'}), 500
+
+
+@user_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password are required'}), 400
+
+    try:
+        # Decode token
+        payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
+
+        # Verify token type
+        if payload.get('type') != 'reset':
+            return jsonify({'error': 'Invalid token type'}), 400
+
+        user = Person.query.filter_by(id=payload['user_id'], deleted_on=None).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Update password
+        user.password = generate_password_hash(new_password)
+        user.updated_on = date.today()
+        user.updated_by = 'PASSWORD_RESET'
+
+        db.session.commit()
+
+        return jsonify({'message': 'Password has been reset successfully. Please login with your new password.'}), 200
+
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Reset link has expired. Please request a new one.'}), 400
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid reset link.'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

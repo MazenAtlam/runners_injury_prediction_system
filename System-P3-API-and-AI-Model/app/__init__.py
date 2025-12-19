@@ -1,7 +1,7 @@
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
-from .config import Config, db, migrate
+from .config import Config, db, migrate, mail
 from .routes.user_bp import user_bp
 from .routes.coach_bp import coach_bp
 from .routes.athlete_bp import athlete_bp
@@ -27,6 +27,7 @@ def create_app(config_class=Config):
     # Initialize Flask Extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    mail.init_app(app)
 
     # --- Register Blueprints (API Modules) ---
     app.register_blueprint(user_bp, url_prefix=f'{API_V1_BASE_URL}/user')

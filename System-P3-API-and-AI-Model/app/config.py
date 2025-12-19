@@ -2,12 +2,16 @@ import os
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_mail import Mail
 
 load_dotenv()
 
 # Initialize the database instance directly here
 db = SQLAlchemy()
 migrate = Migrate()
+
+# Initialize Mail
+mail = Mail()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -50,3 +54,14 @@ class Config:
 
     # Flask-Migrate configuration
     MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), 'migrations')
+
+    # Mail Configuration
+    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.googlemail.com')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', '587'))
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS') is not None
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
+
+    # Frontend URL for Reset Links
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:8081')
