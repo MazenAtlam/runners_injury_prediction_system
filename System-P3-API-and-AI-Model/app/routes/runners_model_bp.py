@@ -2,6 +2,7 @@ import numpy as np
 from flask import Blueprint, request, jsonify
 from ..utils.load_runners_model import load_runners_model, model_state
 from ..utils.generate_alert import generate_alert
+from ..utils.auth import token_required
 
 runners_model_bp = Blueprint('runners_model_bp', __name__)
 
@@ -16,7 +17,8 @@ load_runners_model()
 
 
 @runners_model_bp.route('/predict', methods=['POST'])
-def predict():
+@token_required
+def predict(current_user):
     # Reload if needed
     if model_state['status'] != 'Loaded':
         load_runners_model()
