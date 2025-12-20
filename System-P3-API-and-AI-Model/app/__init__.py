@@ -1,4 +1,3 @@
-import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from .config import Config, db, migrate, mail
@@ -40,7 +39,12 @@ def create_app(config_class=Config):
     # --- Root Route ---
     @app.route('/')
     def index():
-        return "Runners Injury Prediction System Backend Running! Connect your client to /api/v1.0/..."
+        return "Runners Injury Prediction System (RIPS) Backend Running! Connect your client to /api/v1.0/..."
+
+    # --- Health Check Route ---
+    @app.route('/health')
+    def health():
+        return jsonify({'status': 'health'}), 200
 
     # --- Global Error Handler ---
     @app.errorhandler(404)
