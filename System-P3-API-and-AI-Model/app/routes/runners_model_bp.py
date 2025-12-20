@@ -10,12 +10,6 @@ runners_model_bp = Blueprint('runners_model_bp', __name__)
 load_runners_model()
 
 
-# # Test with mock model
-# # To do that, comment the line contains "load_runners_model()" first
-# from ..utils.load_mock_model import load_mock_model, model, scaler
-# load_mock_model()
-
-
 @runners_model_bp.route('/predict', methods=['POST'])
 @token_required
 def predict(current_user):
