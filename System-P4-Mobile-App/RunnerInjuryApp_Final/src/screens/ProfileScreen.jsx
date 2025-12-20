@@ -1,6 +1,7 @@
 // src/screens/ProfileScreen.js
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -37,51 +38,94 @@ const ProfileScreen = ({ navigation }) => {
     try {
       setLoading(true);
 
-      // Fetch additional user details based on type
-      let additionalData = {};
+      // Debug: Log current auth state
+      console.log("👤 Fetching profile for user:", userData);
+
+      // First, try to get basic user data without making additional API calls
+      setProfileData(userData);
+
+      // Then try to fetch additional data if needed
       if (userData.type === "athlete") {
         try {
+          console.log(`👟 Fetching athlete ${userData.id}...`);
           const athleteData = await athleteAPI.getOne(userData.id);
-          additionalData = athleteData;
+          console.log("✅ Athlete data:", athleteData);
+          setProfileData((prev) => ({ ...prev, ...athleteData }));
         } catch (error) {
-          console.log("Could not fetch athlete details, using basic info");
-        }
+          console.log("⚠️ Could not fetch athlete details:", error.message);
 
-        // Fetch athlete stats (sessions, sensor data, etc.)
+          // Handle token errors
+          if (
+            error.status === 401 ||
+            error.message.includes("Authentication failed")
+          ) {
+            console.log("🔐 Token expired, logging out...");
+            // Don't set loading to false yet - we'll handle logout
+            handleTokenExpired();
+            return;
+          }
+        }
+      } else if (userData.type === "coach") {
         try {
-          const sessions = await sessionAPI.getAll();
+          console.log(`🏋️ Fetching coach ${userData.id}...`);
+          const coachData = await coachAPI.getOne(userData.id);
+          console.log("✅ Coach data:", coachData);
+          setProfileData((prev) => ({ ...prev, ...coachData }));
+        } catch (error) {
+          console.log("⚠️ Could not fetch coach details:", error.message);
+
+          // Handle token errors
+          if (
+            error.status === 401 ||
+            error.message.includes("Authentication failed")
+          ) {
+            console.log("🔐 Token expired, logging out...");
+            handleTokenExpired();
+            return;
+          }
+        }
+      }
+
+      // Fetch stats (this can fail silently)
+      try {
+        const sessions = await sessionAPI.getAll();
+        if (userData.type === "athlete") {
           const athleteSessions = sessions.filter(
             (s) => s.athlete_id === userData.id
           );
-
           setStats({
             totalSessions: athleteSessions.length,
             injuryWarnings: 0,
             avgSafetyScore: 85,
           });
-        } catch (error) {
-          console.log("Could not fetch session stats");
         }
-      } else if (userData.type === "coach") {
-        try {
-          const coachData = await coachAPI.getOne(userData.id);
-          additionalData = coachData;
-        } catch (error) {
-          console.log("Could not fetch coach details, using basic info");
-        }
+      } catch (error) {
+        console.log("Could not fetch session stats:", error.message);
       }
-
-      setProfileData({
-        ...userData,
-        ...additionalData,
-      });
     } catch (error) {
-      console.error("Error fetching profile:", error);
-      // Don't show alert for minor errors, just use basic data
-      setProfileData(userData);
+      console.error("❌ Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add this new function to handle expired tokens
+  const handleTokenExpired = () => {
+    Alert.alert(
+      "Session Expired",
+      "Your session has expired. Please login again.",
+      [
+        {
+          text: "OK",
+          onPress: async () => {
+            // Clear all auth data
+            await AsyncStorage.multiRemove(["authToken", "userData"]);
+            // Force logout through context
+            await logout();
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -99,37 +143,61 @@ const ProfileScreen = ({ navigation }) => {
     try {
       setLoading(true);
 
-      // Try to call logout API
+      // Try to call logout API (might fail if token is invalid)
       try {
         await userAPI.logout();
+        console.log("✅ Backend logout successful");
       } catch (apiError) {
         console.log(
-          "API logout failed, continuing with local logout:",
+          "⚠️ API logout failed (might be expired token):",
           apiError.message
         );
+        // Continue with local logout anyway
       }
 
-      // Clear local auth state
+      // Always clear local storage
+      await AsyncStorage.multiRemove(["authToken", "userData"]);
+
+      // Update auth context
       await logout();
 
-      // Show success message
-      Alert.alert("Logged Out", "You have been successfully logged out.", [
+      // Show success message and navigate to login
+      showAlert("Logged Out", "You have been successfully logged out.", [
         {
           text: "OK",
           onPress: () => {
-            // Navigation is handled automatically by AuthContext state change
+            // IMPORTANT: Reset navigation to Login screen
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Login" }],
+            });
           },
         },
       ]);
     } catch (error) {
       console.error("Logout error:", error);
-      Alert.alert(
+      showAlert(
         "Logout Error",
         "There was an issue logging out. Please try again."
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add debug function to check token
+  const checkAuthStatus = async () => {
+    const token = await AsyncStorage.getItem("authToken");
+    const user = await AsyncStorage.getItem("userData");
+
+    Alert.alert(
+      "Auth Debug",
+      `Token: ${token ? `Exists (${token.length} chars)` : "Missing"}\n\n` +
+        `First 30 chars: ${
+          token ? token.substring(0, 30) + "..." : "N/A"
+        }\n\n` +
+        `User Data: ${user ? "Exists" : "Missing"}`
+    );
   };
 
   // Show loading state
@@ -367,11 +435,14 @@ const ProfileScreen = ({ navigation }) => {
             disabled={loading}
           />
 
+          {/* Debug section - can be removed in production */}
           <View style={styles.debugInfo}>
-            <Text style={styles.debugText}>
-              User ID: {userData?.id} | Type: {userData?.type} | Auth:{" "}
-              {userData ? "Yes" : "No"}
-            </Text>
+            <TouchableOpacity onPress={checkAuthStatus}>
+              <Text style={styles.debugText}>
+                User ID: {userData?.id} | Type: {userData?.type} | Auth:{" "}
+                {userData ? "Yes" : "No"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

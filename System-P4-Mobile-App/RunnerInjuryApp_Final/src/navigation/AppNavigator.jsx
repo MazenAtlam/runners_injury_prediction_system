@@ -15,6 +15,7 @@ import RegisterScreen from "../screens/RegisterScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SessionScreen from "../screens/SessionScreen";
+import SensorConnectionScreen from "../screens/SensorConnectionScreen"; // NEW SCREEN
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -269,6 +270,9 @@ export default function AppNavigator() {
             color: COLORS.textPrimary,
             fontWeight: "600",
           },
+          cardStyle: {
+            backgroundColor: COLORS.background,
+          },
         }}
       >
         {!isAuthenticated ? (
@@ -312,8 +316,22 @@ export default function AppNavigator() {
             <Stack.Screen
               name="Session"
               component={SessionScreen}
+              options={({ route }) => ({
+                title: route.params?.isRealData
+                  ? "Arduino Sensor Session"
+                  : "Running Session",
+                headerStyle: {
+                  backgroundColor: COLORS.cardBackground,
+                },
+                headerTintColor: COLORS.textPrimary,
+                headerBackTitle: "Back",
+              })}
+            />
+            <Stack.Screen
+              name="SensorConnect"
+              component={SensorConnectionScreen}
               options={{
-                title: "Running Session",
+                title: "Connect Arduino Sensors",
                 headerStyle: {
                   backgroundColor: COLORS.cardBackground,
                 },

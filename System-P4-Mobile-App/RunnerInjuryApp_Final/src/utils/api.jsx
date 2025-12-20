@@ -12,20 +12,20 @@ const getBaseUrl = () => {
     if (Platform.OS === "android") {
       // ✅ Android emulator - MUST use 10.0.2.2
       console.log("📱 Using Android emulator address: 10.0.2.2");
-      return "http://10.0.2.2:5000/api/v1.0";
+      return "https://mazen-atlam-runners-injury-prediction-system-api.hf.space/api/v1.0";
     } else if (Platform.OS === "ios") {
       // ✅ iOS simulator - localhost works
       console.log("📱 Using iOS simulator address: localhost");
-      return "http://localhost:5000/api/v1.0";
+      return "https://mazen-atlam-runners-injury-prediction-system-api.hf.space/api/v1.0";
     } else {
       // Web or other platforms
       console.log("📱 Using Web/other platform address: localhost");
-      return "http://localhost:5000/api/v1.0";
+      return "https://mazen-atlam-runners-injury-prediction-system-api.hf.space/api/v1.0";
     }
   }
   // For production
   else {
-    return "https://your-production-domain.com/api/v1.0";
+    return "https://mazen-atlam-runners-injury-prediction-system-api.hf.space/api/v1.0";
   }
 };
 
@@ -117,7 +117,7 @@ export const apiCall = async (
         console.log("❌ Could not parse error response:", e.message);
       }
 
-      console.error(`❌ API Error (${endpoint}):`, errorMessage);
+      console.error(`❌ API Error2 (${endpoint}):`, errorMessage);
       throw new Error(errorMessage);
     }
 
@@ -138,7 +138,7 @@ export const apiCall = async (
       throw new Error("Invalid response format from server");
     }
   } catch (error) {
-    console.error(`❌ API Error (${endpoint}):`, error.message);
+    console.error(`❌ API Error1 (${endpoint}):`, error.message);
 
     // Enhanced error messages
     if (
