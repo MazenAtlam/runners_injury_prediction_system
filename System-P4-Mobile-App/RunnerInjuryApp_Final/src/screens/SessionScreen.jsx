@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
 import Button from "../components/Button";
 import Loader from "../components/Loader";
@@ -17,33 +18,39 @@ import { sensorDataAPI, predictionAPI, sessionAPI } from "../utils/api";
 
 const SessionScreen = ({ navigation, route }) => {
   const { userData } = useAuth();
-  const { sessionId } = route.params || {};
+  const { sessionId, realSensorData, isRealData = false } = route.params || {};
 
   const [sessionTime, setSessionTime] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [sensorData, setSensorData] = useState({
-    heart_rate: 165,
-    body_temperature: 37.0,
-    joint_angles: 45.5,
-    gait_speed: 3.2,
-    cadence: 180,
-    step_count: 5000,
-    jump_height: 0.3,
-    ground_reaction_force: 2.5,
-    range_of_motion: 90.0,
-    ambient_temperature: 22.5,
-  });
+  const [sensorData, setSensorData] = useState(
+    isRealData && realSensorData
+      ? realSensorData
+      : {
+          heart_rate: 165,
+          body_temperature: 37.0,
+          joint_angles: 45.5,
+          gait_speed: 3.2,
+          cadence: 180,
+          step_count: 5000,
+          jump_height: 0.3,
+          ground_reaction_force: 2.5,
+          range_of_motion: 90.0,
+          ambient_temperature: 22.5,
+        }
+  );
   const [prediction, setPrediction] = useState(null);
   const [sensorHistory, setSensorHistory] = useState([]);
+  const [usingRealData, setUsingRealData] = useState(isRealData || false);
 
   useEffect(() => {
     let interval = null;
 
-    if (isActive) {
+    if (isActive && !usingRealData) {
+      // Only simulate data if using mock data
       interval = setInterval(() => {
         setSessionTime((time) => time + 1);
-        // Simulate sensor data updates every 5 seconds
+        // Simulate sensor data updates every 5 seconds for mock data
         if (sessionTime % 5 === 0) {
           simulateSensorData();
         }
@@ -53,14 +60,19 @@ const SessionScreen = ({ navigation, route }) => {
     }
 
     return () => clearInterval(interval);
-  }, [isActive, sessionTime]);
+  }, [isActive, sessionTime, usingRealData]);
 
   const simulateSensorData = () => {
+    // Only simulate if using mock data
+    if (usingRealData) return;
+
     // Simulate slight variations in sensor data
     setSensorData((prev) => ({
       ...prev,
       heart_rate: Math.floor(160 + Math.random() * 20),
       step_count: prev.step_count + Math.floor(Math.random() * 50),
+      joint_angles: 45 + Math.random() * 10 - 5,
+      gait_speed: 3.2 + Math.random() * 0.4 - 0.2,
     }));
   };
 
@@ -96,22 +108,25 @@ const SessionScreen = ({ navigation, route }) => {
     }
   };
 
-  const saveSensorData = async () => {
+  const saveSensorData = async (customData = null) => {
     if (!sessionId) return;
 
     try {
+      const dataToSave = customData || sensorData;
       const response = await sensorDataAPI.create({
         session_id: sessionId,
-        ...sensorData,
+        ...dataToSave,
+        data_source: usingRealData ? "arduino" : "mock",
       });
 
       // Add to history
       setSensorHistory((prev) => [
         ...prev,
         {
-          ...sensorData,
+          ...dataToSave,
           id: response.id,
           created_on: new Date().toISOString(),
+          source: usingRealData ? "arduino" : "mock",
         },
       ]);
 
@@ -130,10 +145,9 @@ const SessionScreen = ({ navigation, route }) => {
       return response;
     } catch (error) {
       console.error("Error getting prediction:", error);
-      Alert.alert(
-        "Prediction Error",
-        error.message || "Failed to get injury risk prediction"
-      );
+      const errorMessage =
+        error.message || "Failed to get injury risk prediction";
+      showAlert("Prediction Error", errorMessage);
       throw error;
     } finally {
       setLoading(false);
@@ -141,7 +155,7 @@ const SessionScreen = ({ navigation, route }) => {
   };
 
   const handleEndSession = () => {
-    Alert.alert("End Session", "Are you sure you want to end this session?", [
+    showAlert("End Session", "Are you sure you want to end this session?", [
       { text: "Continue Session", style: "cancel" },
       {
         text: "End Session",
@@ -157,13 +171,15 @@ const SessionScreen = ({ navigation, route }) => {
               const finalPrediction = await getPrediction();
 
               if (finalPrediction) {
-                Alert.alert(
+                showAlert(
                   "Session Complete",
                   `Final Risk Assessment: ${
                     finalPrediction.risk_label
                   }\nConfidence: ${(finalPrediction.confidence * 100).toFixed(
                     1
-                  )}%`
+                  )}%\n\nData Source: ${
+                    usingRealData ? "Arduino Sensors" : "Mock Data"
+                  }`
                 );
               }
             }
@@ -171,7 +187,7 @@ const SessionScreen = ({ navigation, route }) => {
             // Navigate back
             navigation.goBack();
           } catch (error) {
-            Alert.alert("Error", "Failed to properly end session");
+            showAlert("Error", "Failed to properly end session");
           } finally {
             setLoading(false);
           }
@@ -186,11 +202,13 @@ const SessionScreen = ({ navigation, route }) => {
       const predictionResult = await getPrediction();
 
       if (predictionResult) {
-        Alert.alert(
+        showAlert(
           "Injury Risk Assessment",
           `Risk Level: ${predictionResult.risk_label}\nConfidence: ${(
             predictionResult.confidence * 100
-          ).toFixed(1)}%\n\n${
+          ).toFixed(1)}%\nData Source: ${
+            usingRealData ? "Arduino Sensors" : "Mock Data"
+          }\n\n${
             predictionResult.recommendations?.join("\n") ||
             "Continue training safely."
           }`
@@ -203,18 +221,50 @@ const SessionScreen = ({ navigation, route }) => {
 
   const handleSaveData = async () => {
     if (!sessionId) {
-      Alert.alert("Error", "No active session found");
+      showAlert("Error", "No active session found");
       return;
     }
 
     try {
       setLoading(true);
       await saveSensorData();
-      Alert.alert("Success", "Sensor data saved successfully!");
+      showAlert("Success", "Sensor data saved successfully!");
     } catch (error) {
-      Alert.alert("Error", error.message || "Failed to save sensor data");
+      showAlert("Error", error.message || "Failed to save sensor data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectArduino = () => {
+    navigation.navigate("SensorConnect", {
+      sessionId: sessionId,
+      onBack: (arduinoData) => {
+        if (arduinoData) {
+          setSensorData(arduinoData);
+          setUsingRealData(true);
+          setIsActive(true);
+        }
+      },
+    });
+  };
+
+  // Web-compatible alert function
+  const showAlert = (title, message, buttons = [{ text: "OK" }]) => {
+    if (Platform.OS === "web") {
+      if (buttons.length === 1) {
+        window.alert(`${title}\n\n${message}`);
+        if (buttons[0].onPress) buttons[0].onPress();
+      } else if (buttons.length === 2) {
+        const result = window.confirm(`${title}\n\n${message}`);
+        if (result) {
+          if (buttons[1].onPress) buttons[1].onPress();
+        } else {
+          if (buttons[0].onPress) buttons[0].onPress();
+        }
+      }
+    } else {
+      Alert.alert(title, message, buttons);
     }
   };
 
@@ -222,10 +272,26 @@ const SessionScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.title}>Running Session</Text>
+          <View style={styles.headerTop}>
+            <Text style={styles.title}>Running Session</Text>
+            {usingRealData && (
+              <View style={styles.realDataBadge}>
+                <Icon name="bluetooth" size={16} color={COLORS.white} />
+                <Text style={styles.realDataText}>Arduino Data</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.time}>{formatTime(sessionTime)}</Text>
           {sessionId && (
             <Text style={styles.sessionId}>Session ID: {sessionId}</Text>
+          )}
+          {!usingRealData && (
+            <Text style={styles.dataSource}>
+              Using mock data •{" "}
+              <Text style={styles.connectLink} onPress={handleConnectArduino}>
+                Connect Arduino sensors
+              </Text>
+            </Text>
           )}
         </View>
 
@@ -283,7 +349,15 @@ const SessionScreen = ({ navigation, route }) => {
         )}
 
         <View style={styles.sensorSection}>
-          <Text style={styles.sectionTitle}>Current Sensor Data</Text>
+          <View style={styles.sensorHeader}>
+            <Text style={styles.sectionTitle}>Current Sensor Data</Text>
+            {usingRealData && (
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>Live</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.sensorGrid}>
             <View style={styles.sensorItem}>
               <Text style={styles.sensorLabel}>Body Temp</Text>
@@ -307,17 +381,31 @@ const SessionScreen = ({ navigation, route }) => {
                 {sensorData.ambient_temperature}°C
               </Text>
             </View>
+            <View style={styles.sensorItem}>
+              <Text style={styles.sensorLabel}>Ground Force</Text>
+              <Text style={styles.sensorValue}>
+                {sensorData.ground_reaction_force} N
+              </Text>
+            </View>
+            <View style={styles.sensorItem}>
+              <Text style={styles.sensorLabel}>Range of Motion</Text>
+              <Text style={styles.sensorValue}>
+                {sensorData.range_of_motion}°
+              </Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.controls}>
-          <Button
-            title={isActive ? "Pause Session" : "Resume Session"}
-            onPress={() => setIsActive(!isActive)}
-            icon={isActive ? "pause" : "play"}
-            type="outline"
-            style={styles.controlButton}
-          />
+          {!usingRealData && (
+            <Button
+              title={isActive ? "Pause Session" : "Resume Session"}
+              onPress={() => setIsActive(!isActive)}
+              icon={isActive ? "pause" : "play"}
+              type="outline"
+              style={styles.controlButton}
+            />
+          )}
           <Button
             title="Save Data"
             onPress={handleSaveData}
@@ -325,6 +413,14 @@ const SessionScreen = ({ navigation, route }) => {
             style={[styles.controlButton, styles.saveButton]}
             loading={loading}
           />
+          {!usingRealData && (
+            <Button
+              title="Connect Arduino"
+              onPress={handleConnectArduino}
+              icon="bluetooth"
+              style={[styles.controlButton, styles.arduinoButton]}
+            />
+          )}
         </View>
 
         <View style={styles.predictionControls}>
@@ -350,16 +446,27 @@ const SessionScreen = ({ navigation, route }) => {
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {sensorHistory.slice(-5).map((data, index) => (
-                <View key={index} style={styles.historyItem}>
-                  <Text style={styles.historyTime}>
-                    {new Date(data.created_on).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
+                <View
+                  key={index}
+                  style={[
+                    styles.historyItem,
+                    data.source === "arduino" && styles.arduinoHistoryItem,
+                  ]}
+                >
+                  <View style={styles.historyHeader}>
+                    <Text style={styles.historyTime}>
+                      {new Date(data.created_on).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                    {data.source === "arduino" && (
+                      <Icon name="bluetooth" size={12} color={COLORS.primary} />
+                    )}
+                  </View>
                   <Text style={styles.historyValue}>HR: {data.heart_rate}</Text>
                   <Text style={styles.historyValue}>
-                    Steps: {data.step_count}
+                    Temp: {data.body_temperature}°C
                   </Text>
                 </View>
               ))}
@@ -383,10 +490,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.cardBackground,
   },
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
   title: {
     ...TYPOGRAPHY.h2,
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginRight: 8,
+  },
+  realDataBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  realDataText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "bold",
+    marginLeft: 4,
   },
   time: {
     ...TYPOGRAPHY.h1,
@@ -397,6 +525,16 @@ const styles = StyleSheet.create({
   sessionId: {
     ...TYPOGRAPHY.caption,
     color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  dataSource: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+  },
+  connectLink: {
+    color: COLORS.primary,
+    textDecorationLine: "underline",
   },
   stats: {
     padding: 24,
@@ -448,10 +586,36 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
   },
+  sensorHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   sectionTitle: {
     ...TYPOGRAPHY.h3,
     color: COLORS.textPrimary,
-    marginBottom: 16,
+  },
+  liveIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.safe + "20",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.safe,
+    marginRight: 4,
+  },
+  liveText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.safe,
+    fontSize: 10,
+    fontWeight: "bold",
   },
   sensorGrid: {
     flexDirection: "row",
@@ -477,6 +641,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     justifyContent: "space-around",
+    flexWrap: "wrap",
   },
   predictionControls: {
     flexDirection: "row",
@@ -485,7 +650,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
   },
   controlButton: {
-    flex: 0.45,
+    flex: 0.3,
+    minWidth: 110,
+    marginBottom: 8,
   },
   predictButton: {
     flex: 0.8,
@@ -494,6 +661,10 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: COLORS.primaryLight,
     borderColor: COLORS.primaryLight,
+  },
+  arduinoButton: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   stopButton: {
     backgroundColor: COLORS.danger,
@@ -512,10 +683,19 @@ const styles = StyleSheet.create({
     marginRight: 12,
     minWidth: 120,
   },
+  arduinoHistoryItem: {
+    borderWidth: 1,
+    borderColor: COLORS.primary + "50",
+  },
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   historyTime: {
     ...TYPOGRAPHY.caption,
     color: COLORS.textSecondary,
-    marginBottom: 4,
   },
   historyValue: {
     ...TYPOGRAPHY.body,

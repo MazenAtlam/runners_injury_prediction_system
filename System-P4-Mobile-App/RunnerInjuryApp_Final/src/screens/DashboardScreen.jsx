@@ -9,6 +9,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
+  Platform,
 } from "react-native";
 import Button from "../components/Button";
 import AlertModal from "../components/AlertModal";
@@ -56,7 +57,7 @@ const DashboardScreen = ({ navigation }) => {
     setSessionActive(false);
   };
 
-  const handleStartSession = async () => {
+  const handleStartSession = async (useRealSensors = false) => {
     if (!userData || userData.type !== "athlete") {
       Alert.alert("Error", "Only athletes can start sessions");
       return;
@@ -67,14 +68,29 @@ const DashboardScreen = ({ navigation }) => {
       const response = await sessionAPI.create({
         athlete_id: userData.id,
         coach_id: userData.coach_id || 1, // Default to first coach if none specified
+        sensor_type: useRealSensors ? "arduino" : "mock",
       });
 
       setCurrentSession(response);
       setSessionActive(true);
       setShowStartModal(false);
 
-      // Navigate to session screen with session data
-      navigation.navigate("Session", { sessionId: response.id });
+      if (useRealSensors) {
+        // Navigate to sensor connection screen for real Arduino data
+        navigation.navigate("SensorConnect", {
+          sessionId: response.id,
+          onBack: () => {
+            setSessionActive(false);
+            setCurrentSession(null);
+          },
+        });
+      } else {
+        // Navigate to session screen with mock data
+        navigation.navigate("Session", {
+          sessionId: response.id,
+          isRealData: false,
+        });
+      }
     } catch (error) {
       Alert.alert("Error", error.message || "Failed to start session");
     } finally {
@@ -114,7 +130,26 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   const handleConfirmStartSession = () => {
-    handleStartSession();
+    handleStartSession(false); // false = use mock data
+  };
+
+  // Web-compatible alert function
+  const showAlert = (title, message, buttons = [{ text: "OK" }]) => {
+    if (Platform.OS === "web") {
+      if (buttons.length === 1) {
+        window.alert(`${title}\n\n${message}`);
+        if (buttons[0].onPress) buttons[0].onPress();
+      } else if (buttons.length === 2) {
+        const result = window.confirm(`${title}\n\n${message}`);
+        if (result) {
+          if (buttons[1].onPress) buttons[1].onPress();
+        } else {
+          if (buttons[0].onPress) buttons[0].onPress();
+        }
+      }
+    } else {
+      Alert.alert(title, message, buttons);
+    }
   };
 
   return (
@@ -124,12 +159,17 @@ const DashboardScreen = ({ navigation }) => {
         visible={showStartModal}
         onClose={() => setShowStartModal(false)}
         title="Start Running Session"
-        message="Ready to start monitoring your run? Wearable sensors will begin collecting data."
+        message="Ready to start monitoring your run? Choose your data source:"
         icon="run"
         iconColor={COLORS.primary}
-        confirmText="Start Session"
+        confirmText="Use Mock Data"
         onConfirm={handleConfirmStartSession}
         showCancel={true}
+        cancelText="Use Arduino Sensors"
+        onCancel={() => {
+          setShowStartModal(false);
+          handleStartSession(true); // true = use real sensors
+        }}
       />
 
       {/* History Modal */}
@@ -237,12 +277,20 @@ const DashboardScreen = ({ navigation }) => {
                   />
                 </View>
               ) : (
-                <Button
-                  title="Start Running Session"
-                  onPress={() => setShowStartModal(true)}
-                  icon="play"
-                  style={styles.sessionButton}
-                />
+                <View style={styles.sessionOptions}>
+                  <Button
+                    title="Start with Mock Data"
+                    onPress={() => setShowStartModal(true)}
+                    icon="play"
+                    style={[styles.sessionButton, styles.mockButton]}
+                  />
+                  <Button
+                    title="Start with Arduino Sensors"
+                    onPress={() => handleStartSession(true)}
+                    icon="bluetooth"
+                    style={[styles.sessionButton, styles.realButton]}
+                  />
+                </View>
               )}
             </View>
           </View>
@@ -301,7 +349,7 @@ const DashboardScreen = ({ navigation }) => {
                 style={styles.actionCard}
                 onPress={() => {
                   // In a real app, navigate to coach management
-                  Alert.alert(
+                  showAlert(
                     "Coach Features",
                     "Coach management features coming soon!"
                   );
@@ -320,14 +368,230 @@ const DashboardScreen = ({ navigation }) => {
             )}
           </View>
         </View>
+
+        {/* Arduino Sensor Info */}
+        <View style={styles.sensorInfoCard}>
+          <View style={styles.sensorInfoHeader}>
+            <Icon name="bluetooth" size={24} color={COLORS.primary} />
+            <Text style={styles.sensorInfoTitle}>
+              Arduino Sensor Integration
+            </Text>
+          </View>
+          <Text style={styles.sensorInfoText}>
+            Connect your Arduino with HC-05 Bluetooth module to get real-time
+            sensor data including:
+          </Text>
+          <View style={styles.sensorFeatures}>
+            <View style={styles.featureItem}>
+              <Icon name="thermometer" size={16} color={COLORS.danger} />
+              <Text style={styles.featureText}>Body Temperature</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Icon name="axis-arrow" size={16} color={COLORS.primary} />
+              <Text style={styles.featureText}>Joint Angles</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Icon name="speedometer" size={16} color={COLORS.secondary} />
+              <Text style={styles.featureText}>Gait Analysis</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Icon name="weight" size={16} color={COLORS.warning} />
+              <Text style={styles.featureText}>Ground Reaction Force</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.learnMoreButton}
+            onPress={() => {
+              showAlert(
+                "Arduino Setup",
+                "To use Arduino sensors:\n\n1. Flash Arduino with provided code\n2. Connect HC-05 Bluetooth module\n3. Pair with your device (PIN: 1234)\n4. Click 'Start with Arduino Sensors'"
+              );
+            }}
+          >
+            <Text style={styles.learnMoreText}>Learn How to Setup Arduino</Text>
+            <Icon name="chevron-right" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-// Styles remain exactly the same...
 const styles = StyleSheet.create({
-  // ... ALL STYLES REMAIN EXACTLY AS IN YOUR CODE ...
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: COLORS.cardBackground,
+  },
+  welcome: {
+    ...TYPOGRAPHY.h2,
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  subtitle: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+  },
+  profileButton: {
+    padding: 8,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 20,
+    backgroundColor: COLORS.cardBackground,
+    marginTop: 8,
+  },
+  statCard: {
+    alignItems: "center",
+  },
+  statValue: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.textPrimary,
+    marginVertical: 8,
+  },
+  statLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+  },
+  sessionSection: {
+    padding: 16,
+  },
+  sessionCard: {
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sessionTitle: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  sessionDescription: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    marginBottom: 20,
+  },
+  sessionActiveContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  sessionOptions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  sessionButton: {
+    flex: 1,
+  },
+  mockButton: {
+    flex: 0.48,
+    backgroundColor: COLORS.primaryLight,
+  },
+  realButton: {
+    flex: 0.48,
+    backgroundColor: COLORS.secondary,
+  },
+  stopButton: {
+    borderColor: COLORS.danger,
+    marginLeft: 12,
+    flex: 0.4,
+  },
+  quickActions: {
+    padding: 16,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  actionCard: {
+    width: "48%",
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  actionText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  sensorInfoCard: {
+    margin: 16,
+    padding: 20,
+    backgroundColor: COLORS.primary + "10",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary + "30",
+  },
+  sensorInfoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sensorInfoTitle: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.primary,
+    marginLeft: 12,
+  },
+  sensorInfoText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
+  sensorFeatures: {
+    marginBottom: 16,
+  },
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  featureText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textPrimary,
+    marginLeft: 8,
+  },
+  learnMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    backgroundColor: COLORS.primary + "20",
+    borderRadius: 8,
+  },
+  learnMoreText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.primary,
+    fontWeight: "500",
+  },
 });
 
 export default DashboardScreen;
