@@ -1,12 +1,9 @@
 flask==3.1.2
 flask-cors==6.0.1
-scikit-learn==1.2.2; python_version < '3.13'
-scikit-learn==1.6.1; python_version >= '3.13'
+scikit-learn==1.6.1
 joblib==1.5.2
-numpy==1.24.4; python_version < '3.13'
-numpy==2.3.5; python_version >= '3.13'
-pandas==1.5.3; python_version < '3.13'
-pandas==2.3.3; python_version >= '3.13'
+numpy>=2.0.0
+pandas>=2.0.0
 python-dotenv==1.2.1
 requests==2.32.5
 flask-sqlalchemy==3.1.1
@@ -14,3 +11,7 @@ cryptography==46.0.3
 flask-migrate==4.0.7
 PyJWT==2.10.1
 flask-mail==0.10.0
+Werkzeug==3.1.4
+gunicorn==23.0.0
+python-multipart==0.0.21
+psycopg2-binary==2.9.11

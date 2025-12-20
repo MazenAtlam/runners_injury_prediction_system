@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -14,7 +15,7 @@ migrate = Migrate()
 mail = Mail()
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'hf-space-secret-key-change-me')
 
     # API settings
     API_TITLE = os.environ.get('API_TITLE', 'Title Not Found')
@@ -65,3 +66,6 @@ class Config:
 
     # Frontend URL for Reset Links
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:8081')
+
+    # JWT Settings
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
